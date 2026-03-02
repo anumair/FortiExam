@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FortiExam</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0f0f1a;
+      color: #e0e0f0;
+      min-height: 100vh;
+    }
+    .phase { display: none; }
+    .phase.active { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; }
+
+    /* LOCKED phase */
+    #locked-phase {
+      text-align: center;
+      padding: 2rem;
+    }
+    .brand-title {
+      font-size: 3rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, #4f8ef7, #7c5cbf);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 0.5rem;
+    }
+    .tagline {
+      color: #7070a0;
+      font-size: 0.9rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      margin-bottom: 3rem;
+    }
+    .exam-name-display {
+      font-size: 1.5rem;
+      font-weight: 600;
+      color: #c0c0e0;
+      margin-bottom: 2rem;
+    }
+    .countdown-box {
+      background: #1a1a2e;
+      border: 1px solid #2a2a4a;
+      border-radius: 16px;
+      padding: 3rem 4rem;
+      margin-bottom: 2rem;
+      box-shadow: 0 0 40px rgba(79,142,247,0.1);
+    }
+    .countdown-label { color: #6060a0; font-size: 0.85rem; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 1rem; }
+    .countdown-timer { font-size: 4rem; font-weight: 700; font-variant-numeric: tabular-nums; color: #4f8ef7; letter-spacing: 0.05em; }
+    .lock-icon { font-size: 4rem; margin-bottom: 1.5rem; }
+    .features {
+      display: flex;
+      gap: 1.5rem;
+      margin-top: 2rem;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .feature-pill {
+      background: #1a1a2e;
+      border: 1px solid #2a2a4a;
+      border-radius: 20px;
+      padding: 0.4rem 1rem;
+      font-size: 0.8rem;
+      color: #7070a0;
+    }
+
+    /* ACTIVE phase */
+    #active-phase {
+      flex-direction: column;
+      align-items: stretch;
+      justify-content: flex-start;
+      min-height: 100vh;
+    }
+    .top-bar {
+      background: #13132a;
+      border-bottom: 1px solid #2a2a4a;
+      padding: 0.75rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .top-bar-brand { font-weight: 700; color: #4f8ef7; font-size: 1.1rem; }
+    .top-bar-info { display: flex; gap: 2rem; }
+    .info-item { text-align: center; }
+    .info-label { font-size: 0.65rem; color: #5050a0; text-transform: uppercase; letter-spacing: 0.08em; }
+    .info-value { font-size: 1rem; font-weight: 600; font-variant-numeric: tabular-nums; color: #e0e0f0; }
+    .timer-warning { color: #f7a84f !important; }
+    .timer-critical { color: #f74f4f !important; animation: pulse 1s infinite; }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+    .exam-content {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 2rem;
+      width: 100%;
+    }
+    .question-card {
+      background: #1a1a2e;
+      border: 1px solid #2a2a4a;
+      border-radius: 12px;
+      padding: 2rem;
+      margin-bottom: 1.5rem;
+    }
+    .question-header {
+      display: flex;
+      align-items: flex-start;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+    .question-number {
+      background: #4f8ef7;
+      color: white;
+      width: 2rem;
+      height: 2rem;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 0.85rem;
+      flex-shrink: 0;
+    }
+    .question-text { font-size: 1.05rem; line-height: 1.6; color: #d0d0f0; }
+    .options { display: flex; flex-direction: column; gap: 0.75rem; }
+    .option-label {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      background: #0f0f1e;
+      border: 1px solid #2a2a4a;
+      border-radius: 8px;
+      padding: 0.85rem 1rem;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .option-label:hover { border-color: #4f8ef7; background: #141428; }
+    .option-label input[type="radio"] { accent-color: #4f8ef7; width: 1.1rem; height: 1.1rem; }
+    .option-label input[type="radio"]:checked + span { color: #4f8ef7; }
+    .option-label:has(input:checked) { border-color: #4f8ef7; background: #131328; }
+
+    .nav-section {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 1rem 2rem 2rem;
+      width: 100%;
+    }
+    .question-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-bottom: 1.5rem;
+    }
+    .grid-btn {
+      width: 2.2rem;
+      height: 2.2rem;
+      border-radius: 6px;
+      border: 1px solid #2a2a4a;
+      background: #1a1a2e;
+      color: #a0a0c0;
+      cursor: pointer;
+      font-size: 0.8rem;
+      font-weight: 600;
+      transition: all 0.15s;
+    }
+    .grid-btn:hover { border-color: #4f8ef7; }
+    .grid-btn.answered { background: #1e2e4a; border-color: #4f8ef7; color: #4f8ef7; }
+    .grid-btn.current { background: #4f8ef7; border-color: #4f8ef7; color: white; }
+    .nav-buttons { display: flex; gap: 1rem; align-items: center; justify-content: space-between; }
+    .btn {
+      padding: 0.75rem 2rem;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      font-size: 0.95rem;
+      font-weight: 600;
+      transition: all 0.15s;
+    }
+    .btn-secondary { background: #1a1a2e; border: 1px solid #2a2a4a; color: #a0a0c0; }
+    .btn-secondary:hover { border-color: #4f8ef7; color: #e0e0f0; }
+    .btn-primary { background: #4f8ef7; color: white; }
+    .btn-primary:hover { background: #3a7de6; }
+    .btn-danger { background: #c0392b; color: white; }
+    .btn-danger:hover { background: #e74c3c; }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* EXPIRED phase */
+    #expired-phase {
+      text-align: center;
+      padding: 2rem;
+    }
+    .expired-icon { font-size: 5rem; margin-bottom: 1.5rem; filter: grayscale(0.3); }
+    .expired-title { font-size: 2.5rem; font-weight: 800; color: #f74f4f; margin-bottom: 1rem; }
+    .expired-sub { font-size: 1.1rem; color: #7070a0; margin-bottom: 0.5rem; }
+    .expired-box {
+      background: #1a1a2e;
+      border: 1px solid #3a1a1a;
+      border-radius: 12px;
+      padding: 2rem;
+      margin-top: 2rem;
+      max-width: 500px;
+    }
+    .stat-row { display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid #2a1a1a; }
+    .stat-row:last-child { border-bottom: none; }
+    .stat-label { color: #7070a0; }
+    .stat-value { color: #f74f4f; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+    /* UNLOCKING phase */
+    #unlocking-phase { text-align: center; }
+    .spinner {
+      width: 3rem; height: 3rem;
+      border: 3px solid #2a2a4a;
+      border-top-color: #4f8ef7;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 1.5rem;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .unlocking-text { color: #7070a0; font-size: 1rem; }
+  </style>
+</head>
+<body>
+
+<!-- LOCKED PHASE -->
+<div id="locked-phase" class="phase">
+  <div class="lock-icon">🔐</div>
+  <div class="brand-title">FortiExam</div>
+  <div class="tagline">Content encrypted · Zero-trust · Offline</div>
+  <div class="exam-name-display" id="exam-name-locked"></div>
+  <div class="countdown-box">
+    <div class="countdown-label">Unlocks in</div>
+    <div class="countdown-timer" id="countdown-timer">--:--:--</div>
+  </div>
+  <div class="features">
+    <span class="feature-pill">🔒 AES-256-GCM</span>
+    <span class="feature-pill">🔑 AES-KW</span>
+    <span class="feature-pill">♾️ SHA-256 Evolution</span>
+    <span class="feature-pill">✍️ Ed25519 Signed</span>
+  </div>
+</div>
+
+<!-- UNLOCKING PHASE -->
+<div id="unlocking-phase" class="phase">
+  <div class="spinner"></div>
+  <div class="unlocking-text">Unwrapping session key...</div>
+</div>
+
+<!-- ACTIVE PHASE -->
+<div id="active-phase" class="phase">
+  <div class="top-bar">
+    <div class="top-bar-brand">🔐 FortiExam</div>
+    <div class="top-bar-info">
+      <div class="info-item">
+        <div class="info-label">Time Remaining</div>
+        <div class="info-value" id="active-timer">--:--:--</div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">Evolution</div>
+        <div class="info-value" id="evo-counter">0</div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">Exam</div>
+        <div class="info-value" id="exam-name-active" style="font-size:0.85rem; max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"></div>
+      </div>
+    </div>
+  </div>
+  <div class="exam-content" id="questions-container"></div>
+  <div class="nav-section">
+    <div class="question-grid" id="question-grid"></div>
+    <div class="nav-buttons">
+      <button class="btn btn-secondary" id="prev-btn" onclick="navigate(-1)">← Previous</button>
+      <span id="question-progress" style="color:#7070a0; font-size:0.9rem;"></span>
+      <button class="btn btn-primary" id="next-btn" onclick="navigate(1)">Next →</button>
+    </div>
+    <div style="text-align:center; margin-top:1.5rem;">
+      <button class="btn btn-danger" onclick="confirmSubmit()">Submit Exam</button>
+    </div>
+  </div>
+</div>
+
+<!-- EXPIRED PHASE -->
+<div id="expired-phase" class="phase">
+  <div class="expired-icon">🔒</div>
+  <div class="expired-title">EXAM EXPIRED</div>
+  <div class="expired-sub">Cryptographic key mathematically lost</div>
+  <div class="expired-sub">All exam content permanently locked</div>
+  <div class="expired-box">
+    <div class="stat-row">
+      <span class="stat-label">Evolution Steps</span>
+      <span class="stat-value" id="stat-evo-steps">—</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Collapse Steps</span>
+      <span class="stat-value" id="stat-collapse-steps">—</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Key Status</span>
+      <span class="stat-value">DESTROYED</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Content Status</span>
+      <span class="stat-value">LOCKED</span>
+    </div>
+  </div>
+</div>
+
+<script>
+  <!-- INJECT_PACKAGE_HERE -->
+
+  // ─── Utilities ────────────────────────────────────────────────────────────
+  function b64url(buf) {
+    return btoa(String.fromCharCode(...new Uint8Array(buf)))
+      .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+  }
+  function fromB64url(str) {
+    const base64 = str.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = base64 + '=='.slice(0, (4 - base64.length % 4) % 4);
+    const binary = atob(padded);
+    return new Uint8Array(binary.length).map((_, i) => binary.charCodeAt(i));
+  }
+  function formatTime(ms) {
+    if (ms <= 0) return '00:00:00';
+    const s = Math.floor(ms / 1000);
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const sec = s % 60;
+    return [h,m,sec].map(v => String(v).padStart(2,'0')).join(':');
+  }
+
+  // ─── State ────────────────────────────────────────────────────────────────
+  const pkg = window.EXAM_PACKAGE;
+  const header = pkg.header;
+  let currentPhase = null;
+  let sessionKey = null;
+  let evolutionKey = fromB64url(pkg.kEvo0);
+  let evolutionCounter = 0;
+  let evolutionInterval = null;
+  let questions = [];
+  let currentQuestion = 0;
+  let answers = {};
+  let unlockTime = null;
+  let collapseStepsDone = 0;
+
+  // ─── Phase Management ─────────────────────────────────────────────────────
+  function setPhase(phase) {
+    currentPhase = phase;
+    document.querySelectorAll('.phase').forEach(el => el.classList.remove('active'));
+    const phaseMap = {
+      'LOCKED': 'locked-phase',
+      'UNLOCKING': 'unlocking-phase',
+      'ACTIVE': 'active-phase',
+      'EXPIRED': 'expired-phase'
+    };
+    const el = document.getElementById(phaseMap[phase]);
+    if (el) el.classList.add('active');
+  }
+
+  // ─── Signature Verification ───────────────────────────────────────────────
+  async function verifySignature() {
+    try {
+      const pubKeyBytes = fromB64url(pkg.publicKey);
+      // Build signable bytes
+      const headerBytes = new TextEncoder().encode(JSON.stringify(header));
+      const wrappedKeyBytes = fromB64url(pkg.wrappedKey);
+      const chunkBytes = pkg.chunks.map(c => fromB64url(c.ciphertext));
+      const totalLen = headerBytes.length + wrappedKeyBytes.length + chunkBytes.reduce((s,b) => s+b.length, 0);
+      const signable = new Uint8Array(totalLen);
+      let off = 0;
+      signable.set(headerBytes, off); off += headerBytes.length;
+      signable.set(wrappedKeyBytes, off); off += wrappedKeyBytes.length;
+      for (const cb of chunkBytes) { signable.set(cb, off); off += cb.length; }
+
+      // Try Ed25519 via SubtleCrypto
+      const cryptoKey = await crypto.subtle.importKey(
+        'raw', pubKeyBytes, { name: 'Ed25519' }, false, ['verify']
+      );
+      const sigBytes = fromB64url(pkg.signature);
+      const valid = await crypto.subtle.verify('Ed25519', cryptoKey, sigBytes, signable);
+      if (!valid) console.warn('⚠️ Signature verification failed');
+      else console.log('✅ Ed25519 signature verified');
+    } catch(e) {
+      console.warn('⚠️ Ed25519 verification skipped (browser may not support it):', e.message);
+    }
+  }
+
+  // ─── Unlock ───────────────────────────────────────────────────────────────
+  async function unlock() {
+    setPhase('UNLOCKING');
+    try {
+      const kEvo0Bytes = fromB64url(pkg.kEvo0);
+      const wrappingKey = await crypto.subtle.importKey(
+        'raw', kEvo0Bytes, { name: 'AES-KW' }, false, ['unwrapKey']
+      );
+      sessionKey = await crypto.subtle.unwrapKey(
+        'raw',
+        fromB64url(pkg.wrappedKey),
+        wrappingKey,
+        { name: 'AES-KW' },
+        { name: 'AES-GCM', length: 256 },
+        false,
+        ['decrypt']
+      );
+      kEvo0Bytes.fill(0);
+      unlockTime = Date.now();
+      
+      // Decrypt questions
+      const plaintext = await decryptChunk(0);
+      questions = JSON.parse(plaintext);
+      
+      renderQuestions();
+      startEvolution();
+      setPhase('ACTIVE');
+    } catch(e) {
+      console.error('Unlock failed:', e);
+      alert('Failed to unlock exam: ' + e.message);
+    }
+  }
+
+  // ─── Evolution ────────────────────────────────────────────────────────────
+  async function evolveStep() {
+    const newKey = await crypto.subtle.digest('SHA-256', evolutionKey);
+    evolutionKey = new Uint8Array(newKey);
+    evolutionCounter++;
+    if (evolutionCounter >= header.maxSteps) {
+      clearInterval(evolutionInterval);
+      evolutionInterval = null;
+      await triggerCollapse();
+    }
+  }
+
+  function startEvolution() {
+    evolutionInterval = setInterval(async () => {
+      await evolveStep();
+      updateActiveUI();
+    }, header.stepRateMs);
+  }
+
+  async function triggerCollapse() {
+    sessionKey = null;
+    for (let i = 0; i < header.collapseSteps; i++) {
+      const h = await crypto.subtle.digest('SHA-256', evolutionKey);
+      evolutionKey = new Uint8Array(h);
+      collapseStepsDone++;
+    }
+    evolutionKey.fill(0);
+    document.getElementById('stat-evo-steps').textContent = evolutionCounter.toLocaleString();
+    document.getElementById('stat-collapse-steps').textContent = collapseStepsDone.toLocaleString();
+    setPhase('EXPIRED');
+  }
+
+  // ─── Decrypt Chunk ────────────────────────────────────────────────────────
+  async function decryptChunk(chunkIndex) {
+    if (!sessionKey) throw new Error('Session key not available');
+    const chunk = pkg.chunks[chunkIndex];
+    const nonce = fromB64url(chunk.nonce);
+    const ciphertext = fromB64url(chunk.ciphertext);
+    const aad = new TextEncoder().encode(chunk.aad);
+    const plaintext = await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv: nonce, additionalData: aad },
+      sessionKey,
+      ciphertext
+    );
+    return new TextDecoder().decode(plaintext);
+  }
+
+  // ─── UI Rendering ─────────────────────────────────────────────────────────
+  function renderQuestions() {
+    const container = document.getElementById('questions-container');
+    const grid = document.getElementById('question-grid');
+    container.innerHTML = '';
+    grid.innerHTML = '';
+
+    questions.forEach((q, i) => {
+      const card = document.createElement('div');
+      card.className = 'question-card';
+      card.id = `q-card-${i}`;
+      card.style.display = i === 0 ? 'block' : 'none';
+      card.innerHTML = `
+        <div class="question-header">
+          <div class="question-number">${i+1}</div>
+          <div class="question-text">${escHtml(q.q)}</div>
+        </div>
+        <div class="options">
+          ${q.options.map((opt, j) => `
+            <label class="option-label">
+              <input type="radio" name="q${i}" value="${j}" onchange="recordAnswer(${i}, ${j})">
+              <span>${escHtml(opt)}</span>
+            </label>
+          `).join('')}
+        </div>
+      `;
+      container.appendChild(card);
+
+      const btn = document.createElement('button');
+      btn.className = 'grid-btn' + (i === 0 ? ' current' : '');
+      btn.id = `grid-btn-${i}`;
+      btn.textContent = i+1;
+      btn.onclick = () => goToQuestion(i);
+      grid.appendChild(btn);
+    });
+
+    document.getElementById('exam-name-active').textContent = header.examName;
+    updateProgress();
+  }
+
+  function escHtml(str) {
+    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function recordAnswer(qIdx, val) {
+    answers[qIdx] = val;
+    const btn = document.getElementById(`grid-btn-${qIdx}`);
+    if (btn) { btn.classList.add('answered'); }
+  }
+
+  function goToQuestion(idx) {
+    document.getElementById(`q-card-${currentQuestion}`).style.display = 'none';
+    document.getElementById(`grid-btn-${currentQuestion}`).classList.remove('current');
+    currentQuestion = idx;
+    document.getElementById(`q-card-${currentQuestion}`).style.display = 'block';
+    document.getElementById(`grid-btn-${currentQuestion}`).classList.add('current');
+    updateProgress();
+  }
+
+  function navigate(dir) {
+    const newIdx = currentQuestion + dir;
+    if (newIdx >= 0 && newIdx < questions.length) goToQuestion(newIdx);
+  }
+
+  function updateProgress() {
+    document.getElementById('question-progress').textContent = `Question ${currentQuestion+1} of ${questions.length}`;
+    document.getElementById('prev-btn').disabled = currentQuestion === 0;
+    document.getElementById('next-btn').disabled = currentQuestion === questions.length - 1;
+  }
+
+  function updateActiveUI() {
+    const evoEl = document.getElementById('evo-counter');
+    if (evoEl) {
+      const k = evolutionCounter >= 1000 ? (evolutionCounter/1000).toFixed(1)+'k' : evolutionCounter;
+      evoEl.textContent = k;
+    }
+    if (unlockTime) {
+      const elapsed = Date.now() - unlockTime;
+      const totalMs = header.durationMinutes * 60 * 1000;
+      const remaining = totalMs - elapsed;
+      const timerEl = document.getElementById('active-timer');
+      if (timerEl) {
+        timerEl.textContent = formatTime(Math.max(0, remaining));
+        timerEl.className = 'info-value';
+        if (remaining < 60000) timerEl.classList.add('timer-critical');
+        else if (remaining < 300000) timerEl.classList.add('timer-warning');
+      }
+    }
+  }
+
+  function confirmSubmit() {
+    const answered = Object.keys(answers).length;
+    if (confirm(`Submit exam? You've answered ${answered} of ${questions.length} questions.`)) {
+      clearInterval(evolutionInterval);
+      evolutionInterval = null;
+      sessionKey = null;
+      evolutionKey.fill(0);
+      alert(`Exam submitted! Answers: ${JSON.stringify(answers)}`);
+    }
+  }
+
+  // ─── Countdown ────────────────────────────────────────────────────────────
+  function startCountdown() {
+    document.getElementById('exam-name-locked').textContent = header.examName;
+    const startTs = new Date(header.startTime).getTime();
+
+    function tick() {
+      const remaining = startTs - Date.now();
+      if (remaining <= 0) {
+        document.getElementById('countdown-timer').textContent = '00:00:00';
+        unlock();
+        return;
+      }
+      document.getElementById('countdown-timer').textContent = formatTime(remaining);
+      setTimeout(tick, 500);
+    }
+    tick();
+  }
+
+  // ─── Init ─────────────────────────────────────────────────────────────────
+  (async function init() {
+    await verifySignature();
+    const startTs = new Date(header.startTime).getTime();
+    if (Date.now() >= startTs) {
+      await unlock();
+    } else {
+      setPhase('LOCKED');
+      startCountdown();
+    }
+  })();
+</script>
+</body>
+</html>

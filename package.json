@@ -1,0 +1,11 @@
+{
+  "name": "fortiexam",
+  "version": "1.0.0",
+  "description": "Secure Examination System with Forward-Evolving Key Cryptography",
+  "type": "module",
+  "workspaces": ["authority"],
+  "scripts": {
+    "demo": "node demo/run-demo.js",
+    "generate": "node authority/cli.js generate"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "name": "fortiexam-authority",
+  "version": "1.0.0",
+  "description": "FortiExam Authority CLI - generates encrypted exam packages",
+  "type": "module",
+  "bin": { "fortiexam": "./cli.js" },
+  "main": "./packager.js",
+  "dependencies": {
+    "@noble/ed25519": "^2.1.0",
+    "commander": "^12.0.0"
+  }
+}
