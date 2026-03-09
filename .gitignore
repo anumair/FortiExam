@@ -3,3 +3,6 @@ dist/
 *.log
 *.txt
 .DS_Store
+fortiexam.json
+server/uploads/
+server/packages/
