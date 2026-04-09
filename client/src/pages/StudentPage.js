@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 const EPOCH_TIME = process.env.REACT_APP_EPOCH_TIME || "2025-01-01T00:00:00Z";
 const STEP_SIZE_SECONDS = Number(process.env.REACT_APP_STEP_SIZE_SECONDS || "300");
@@ -66,14 +66,6 @@ function StudentPage() {
   const [paperUrl, setPaperUrl] = useState("");
 
   const epochMs = useMemo(() => new Date(EPOCH_TIME).getTime(), []);
-
-  useEffect(() => {
-    return () => {
-      if (paperUrl) {
-        URL.revokeObjectURL(paperUrl);
-      }
-    };
-  }, [paperUrl]);
 
   const handlePackageProcess = async (event) => {
     event.preventDefault();
@@ -209,8 +201,14 @@ function StudentPage() {
         setPaperText(text);
         setStudentStatus("Decryption successful.");
       }
+
+      fetch("/api/student/decrypt-log", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ exam_id, exam_time }),
+      }).catch(() => {});
     } catch (error) {
-      setStudentStatus("Access denied or invalid time.");
+      setStudentStatus(error.message || "Access denied or invalid time.");
       setStudentError(true);
     }
   };
@@ -219,7 +217,7 @@ function StudentPage() {
     <div>
       <h1 className="page-title">Student Module</h1>
       <p className="page-subtitle">
-        Fetch package by exam ID, verify signature, and decrypt the paper.
+        Fetch package by exam ID, verify signature, decrypt, and display the paper.
       </p>
       <div className="card">
         <form onSubmit={handlePackageProcess}>
@@ -249,6 +247,7 @@ function StudentPage() {
           </div>
         )}
       </div>
+
       {paperUrl && (
         <div className="card" style={{ marginTop: 16 }}>
           <iframe

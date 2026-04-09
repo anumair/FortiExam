@@ -52,6 +52,12 @@
   margin-top: 16px;
 }
 
+.section-title {
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 12px;
+}
+
 .tabs {
   display: inline-flex;
   background: #e2e8f0;
@@ -147,4 +153,27 @@
   color: #64748b;
   font-size: 13px;
   margin-top: 6px;
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.table th,
+.table td {
+  text-align: left;
+  padding: 10px 12px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.table th {
+  color: #475569;
+  font-weight: 600;
+  background: #f8fafc;
 }

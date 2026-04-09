@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 function AdminPage() {
   const [examId, setExamId] = useState("");
@@ -6,6 +6,27 @@ function AdminPage() {
   const [file, setFile] = useState(null);
   const [adminStatus, setAdminStatus] = useState("");
   const [adminError, setAdminError] = useState(false);
+  const [history, setHistory] = useState([]);
+  const [historyStatus, setHistoryStatus] = useState("");
+
+  const loadHistory = async () => {
+    setHistoryStatus("Loading history...");
+    try {
+      const response = await fetch("/api/admin/exams/history");
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to load history");
+      }
+      setHistory(data);
+      setHistoryStatus("");
+    } catch (error) {
+      setHistoryStatus(error.message);
+    }
+  };
+
+  useEffect(() => {
+    loadHistory();
+  }, []);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -40,6 +61,7 @@ function AdminPage() {
       setExamId("");
       setExamTime("");
       setFile(null);
+      loadHistory();
     } catch (error) {
       setAdminStatus(error.message);
       setAdminError(true);
@@ -113,6 +135,37 @@ function AdminPage() {
         {adminStatus && (
           <div className={`status ${adminError ? "error" : ""}`}>
             {adminStatus}
+          </div>
+        )}
+      </div>
+      <div className="card">
+        <div className="section-title">Exam Package History</div>
+        {historyStatus && <div className="status error">{historyStatus}</div>}
+        {history.length === 0 && !historyStatus && (
+          <div className="helper">No packages created yet.</div>
+        )}
+        {history.length > 0 && (
+          <div className="table-wrap">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Exam ID</th>
+                  <th>Exam Time (UTC)</th>
+                  <th>Created</th>
+                  <th>Version</th>
+                </tr>
+              </thead>
+              <tbody>
+                {history.map((item) => (
+                  <tr key={item._id}>
+                    <td>{item.exam_id}</td>
+                    <td>{new Date(item.exam_time).toISOString()}</td>
+                    <td>{new Date(item.createdAt).toLocaleString()}</td>
+                    <td>{item.version}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </div>

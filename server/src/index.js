@@ -5,11 +5,18 @@ const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
 const multer = require("multer");
+const mongoose = require("mongoose");
+const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
+const User = require("./models/User");
+const ExamPackage = require("./models/ExamPackage");
+const DecryptLog = require("./models/DecryptLog");
 
 dotenv.config();
 
 const app = express();
 app.use(cors());
+app.use(express.json());
 
 const uploadsDir = path.join(__dirname, "..", "uploads");
 if (!fs.existsSync(uploadsDir)) {
@@ -61,6 +68,14 @@ const k0 = Buffer.from(k0Hex, "hex");
 if (k0.length !== 32) {
   throw new Error("K0_HEX must be 32 bytes (64 hex chars)");
 }
+const jwtSecret = process.env.JWT_SECRET || "change_me";
+
+const connectDb = async () => {
+  if (!process.env.MONGO_URI) {
+    throw new Error("MONGO_URI is not set");
+  }
+  await mongoose.connect(process.env.MONGO_URI, { dbName: "exam_system" });
+};
 
 const sha256 = (data) => crypto.createHash("sha256").update(data).digest();
 
@@ -85,6 +100,108 @@ app.get("/api/student/packages/:examId", (req, res) => {
   }
 
   return res.sendFile(packagePath);
+});
+
+app.post("/api/student/decrypt-log", async (req, res) => {
+  try {
+    const { exam_id, exam_time } = req.body;
+    if (!exam_id || !exam_time) {
+      return res.status(400).json({ error: "exam_id and exam_time required" });
+    }
+    const examTimeDate = new Date(exam_time);
+    if (Number.isNaN(examTimeDate.getTime())) {
+      return res.status(400).json({ error: "Invalid exam_time" });
+    }
+
+    const log = await DecryptLog.create({
+      exam_id,
+      exam_time: examTimeDate,
+      decrypted_at: new Date(),
+    });
+    return res.status(201).json({ success: true, id: log._id });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+app.get("/api/admin/exams/history", async (req, res) => {
+  try {
+    const history = await ExamPackage.find()
+      .sort({ createdAt: -1 })
+      .select("-ciphertext");
+    return res.json(history);
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+app.post("/api/auth/signup", async (req, res) => {
+  try {
+    const { name, email, password, role } = req.body;
+    if (!name || !email || !password || !role) {
+      return res.status(400).json({ error: "name, email, password, role required" });
+    }
+    if (!["admin", "student"].includes(role)) {
+      return res.status(400).json({ error: "Invalid role" });
+    }
+
+    const existing = await User.findOne({ email: email.toLowerCase() });
+    if (existing) {
+      return res.status(409).json({ error: "Email already registered" });
+    }
+
+    const password_hash = await bcrypt.hash(password, 10);
+    const user = await User.create({ name, email, password_hash, role });
+
+    const token = jwt.sign({ sub: user._id, role: user.role }, jwtSecret, {
+      expiresIn: "7d",
+    });
+
+    return res.status(201).json({
+      token,
+      role: user.role,
+      name: user.name,
+      email: user.email,
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+app.post("/api/auth/login", async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ error: "email and password required" });
+    }
+
+    const user = await User.findOne({ email: email.toLowerCase() });
+    if (!user) {
+      return res.status(401).json({ error: "Invalid credentials" });
+    }
+
+    const match = await bcrypt.compare(password, user.password_hash);
+    if (!match) {
+      return res.status(401).json({ error: "Invalid credentials" });
+    }
+
+    const token = jwt.sign({ sub: user._id, role: user.role }, jwtSecret, {
+      expiresIn: "7d",
+    });
+
+    return res.json({
+      token,
+      role: user.role,
+      name: user.name,
+      email: user.email,
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: "Internal server error" });
+  }
 });
 
 app.post(
@@ -163,6 +280,10 @@ app.post(
       const packagePath = path.join(packagesDir, packageFileName);
 
       await fs.promises.writeFile(packagePath, JSON.stringify(fullPackage, null, 2));
+      await ExamPackage.create({
+        ...fullPackage,
+        exam_time: new Date(examTimeUtc),
+      });
 
       return res.json({
         success: true,
@@ -177,6 +298,13 @@ app.post(
 );
 
 const port = process.env.PORT || 5000;
-app.listen(port, () => {
-  console.log(`Server running on port ${port}`);
-});
+connectDb()
+  .then(() => {
+    app.listen(port, () => {
+      console.log(`Server running on port ${port}`);
+    });
+  })
+  .catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });
