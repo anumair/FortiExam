@@ -11,6 +11,7 @@ const jwt = require("jsonwebtoken");
 const User = require("./models/User");
 const ExamPackage = require("./models/ExamPackage");
 const DecryptLog = require("./models/DecryptLog");
+const AnswerSubmission = require("./models/AnswerSubmission");
 
 dotenv.config();
 
@@ -70,6 +71,40 @@ if (k0.length !== 32) {
 }
 const jwtSecret = process.env.JWT_SECRET || "change_me";
 
+const authenticate = (req, res, next) => {
+  const header = req.headers.authorization || "";
+  const [type, token] = header.split(" ");
+  if (type !== "Bearer" || !token) {
+    return res.status(401).json({ error: "Authorization required" });
+  }
+  try {
+    const payload = jwt.verify(token, jwtSecret);
+    req.user = payload;
+    return next();
+  } catch (error) {
+    return res.status(401).json({ error: "Invalid token" });
+  }
+};
+
+const requireAdmin = (req, res, next) => {
+  if (req.user?.role !== "admin") {
+    return res.status(403).json({ error: "Admin access required" });
+  }
+  return next();
+};
+
+const normalizeAnswers = (value) => {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+  const keys = Object.keys(value).sort((a, b) => Number(a) - Number(b));
+  const normalized = {};
+  keys.forEach((key) => {
+    normalized[key] = value[key];
+  });
+  return normalized;
+};
+
 const connectDb = async () => {
   if (!process.env.MONGO_URI) {
     throw new Error("MONGO_URI is not set");
@@ -125,12 +160,89 @@ app.post("/api/student/decrypt-log", async (req, res) => {
   }
 });
 
+app.post("/api/student/submit-answers", authenticate, async (req, res) => {
+  try {
+    if (req.user?.role !== "student") {
+      return res.status(403).json({ error: "Student access required" });
+    }
+    const { exam_id, answers, signature } = req.body;
+    if (!exam_id || !answers || !signature) {
+      return res.status(400).json({ error: "exam_id, answers, signature required" });
+    }
+
+    const student = await User.findById(req.user.sub).select("public_key");
+    if (!student || !student.public_key) {
+      return res.status(400).json({ error: "Student public key not found" });
+    }
+
+    const normalizedAnswers = normalizeAnswers(answers);
+    if (!normalizedAnswers) {
+      return res.status(400).json({ error: "Invalid answers payload" });
+    }
+
+    const message = JSON.stringify(normalizedAnswers);
+    const publicKey = crypto.createPublicKey({
+      key: Buffer.from(student.public_key, "base64"),
+      format: "der",
+      type: "spki",
+    });
+    const verified = crypto.verify(
+      null,
+      Buffer.from(message),
+      publicKey,
+      Buffer.from(signature, "base64")
+    );
+
+    if (!verified) {
+      return res.status(400).json({ error: "Signature verification failed" });
+    }
+
+    const submission = await AnswerSubmission.create({
+      exam_id,
+      student: student._id,
+      answers: normalizedAnswers,
+      signature,
+      verified: true,
+      submitted_at: new Date(),
+    });
+
+    return res.status(201).json({ success: true, verified: true, id: submission._id });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 app.get("/api/admin/exams/history", async (req, res) => {
   try {
     const history = await ExamPackage.find()
       .sort({ createdAt: -1 })
       .select("-ciphertext");
     return res.json(history);
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+app.get("/api/admin/submissions", authenticate, requireAdmin, async (req, res) => {
+  try {
+    const submissions = await AnswerSubmission.find()
+      .sort({ submitted_at: -1, createdAt: -1 })
+      .populate("student", "name email")
+      .lean();
+    const response = submissions.map((item) => ({
+      _id: item._id,
+      exam_id: item.exam_id,
+      student_id: item.student?._id,
+      student_name: item.student?.name,
+      student_email: item.student?.email,
+      answers: item.answers,
+      signature: item.signature,
+      submitted_at: item.submitted_at || item.createdAt,
+      verified: item.verified,
+    }));
+    return res.json(response);
   } catch (error) {
     console.error(error);
     return res.status(500).json({ error: "Internal server error" });

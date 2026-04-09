@@ -12,6 +12,14 @@ const base64ToBytes = (value) => {
   return bytes;
 };
 
+const bytesToBase64 = (value) => {
+  let binary = "";
+  value.forEach((byte) => {
+    binary += String.fromCharCode(byte);
+  });
+  return btoa(binary);
+};
+
 const hexToBytes = (value) => {
   const bytes = new Uint8Array(value.length / 2);
   for (let i = 0; i < bytes.length; i += 1) {
@@ -85,6 +93,15 @@ const formatTime = (value) => {
   return `${minutes}:${String(seconds).padStart(2, "0")}`;
 };
 
+const normalizeAnswers = (value) => {
+  const sortedKeys = Object.keys(value).sort((a, b) => Number(a) - Number(b));
+  const normalized = {};
+  sortedKeys.forEach((key) => {
+    normalized[key] = value[key];
+  });
+  return normalized;
+};
+
 function StudentPage() {
   const [studentExamId, setStudentExamId] = useState("");
   const [studentStatus, setStudentStatus] = useState("");
@@ -98,6 +115,10 @@ function StudentPage() {
   const [globalTimeLeft, setGlobalTimeLeft] = useState(0);
   const [quizActive, setQuizActive] = useState(false);
   const [quizFinished, setQuizFinished] = useState(false);
+  const [examIdForQuiz, setExamIdForQuiz] = useState("");
+  const [submissionStatus, setSubmissionStatus] = useState("");
+  const [submissionError, setSubmissionError] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const epochMs = useMemo(() => new Date(EPOCH_TIME).getTime(), []);
 
@@ -145,6 +166,10 @@ function StudentPage() {
     setAnswers({});
     setQuizActive(false);
     setQuizFinished(false);
+    setExamIdForQuiz("");
+    setSubmissionStatus("");
+    setSubmissionError(false);
+    setSubmitting(false);
 
     if (!studentExamId.trim()) {
       setStudentStatus("Please enter Exam ID.");
@@ -279,6 +304,7 @@ function StudentPage() {
         setGlobalTimeLeft(parsedQuestions.length * 60);
         setQuizActive(true);
         setQuizFinished(false);
+        setExamIdForQuiz(exam_id);
         setStudentStatus("Quiz started.");
       } else if (isPdf) {
         const blob = new Blob([plainBytes], { type: "application/pdf" });
@@ -299,6 +325,75 @@ function StudentPage() {
     } catch (error) {
       setStudentStatus(error.message || "Access denied or invalid time.");
       setStudentError(true);
+    }
+  };
+
+  const handleSubmitAnswers = async () => {
+    setSubmissionStatus("");
+    setSubmissionError(false);
+
+    if (!examIdForQuiz) {
+      setSubmissionStatus("Exam ID missing for submission.");
+      setSubmissionError(true);
+      return;
+    }
+
+    const token = localStorage.getItem("auth_token");
+    if (!token) {
+      setSubmissionStatus("Please log in again to submit answers.");
+      setSubmissionError(true);
+      return;
+    }
+
+    const privateKeyBase64 = localStorage.getItem("student_private_key");
+    if (!privateKeyBase64) {
+      setSubmissionStatus("Private key not found in this browser.");
+      setSubmissionError(true);
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      const normalizedAnswers = normalizeAnswers(answers);
+      const message = JSON.stringify(normalizedAnswers);
+      const keyBytes = base64ToBytes(privateKeyBase64);
+      const privateKey = await crypto.subtle.importKey(
+        "pkcs8",
+        keyBytes.buffer,
+        { name: "Ed25519" },
+        false,
+        ["sign"]
+      );
+      const signature = await crypto.subtle.sign(
+        { name: "Ed25519" },
+        privateKey,
+        new TextEncoder().encode(message)
+      );
+      const signatureBase64 = bytesToBase64(new Uint8Array(signature));
+
+      const response = await fetch("/api/student/submit-answers", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          exam_id: examIdForQuiz,
+          answers: normalizedAnswers,
+          signature: signatureBase64,
+        }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload.error || "Submission failed");
+      }
+      setSubmissionStatus("Answers submitted and verified.");
+      setSubmissionError(false);
+    } catch (error) {
+      setSubmissionStatus(error.message || "Submission failed.");
+      setSubmissionError(true);
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -362,9 +457,26 @@ function StudentPage() {
             <div>Question time: {formatTime(timeLeft)}</div>
           </div>
           {quizFinished ? (
-            <div className="status">
-              Quiz ended. You answered {Object.keys(answers).length} out of{" "}
-              {questions.length} questions.
+            <div>
+              <div className="status">
+                Quiz ended. You answered {Object.keys(answers).length} out of{" "}
+                {questions.length} questions.
+              </div>
+              <div className="actions">
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={handleSubmitAnswers}
+                  disabled={submitting}
+                >
+                  {submitting ? "Submitting..." : "Submit Answers"}
+                </button>
+              </div>
+              {submissionStatus && (
+                <div className={`status ${submissionError ? "error" : ""}`}>
+                  {submissionStatus}
+                </div>
+              )}
             </div>
           ) : (
             questions[currentIndex] && (

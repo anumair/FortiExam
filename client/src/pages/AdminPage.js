@@ -9,6 +9,8 @@ function AdminPage() {
   const [adminError, setAdminError] = useState(false);
   const [history, setHistory] = useState([]);
   const [historyStatus, setHistoryStatus] = useState("");
+  const [submissions, setSubmissions] = useState([]);
+  const [submissionsStatus, setSubmissionsStatus] = useState("");
 
   const loadHistory = async () => {
     setHistoryStatus("Loading history...");
@@ -25,8 +27,31 @@ function AdminPage() {
     }
   };
 
+  const loadSubmissions = async () => {
+    setSubmissionsStatus("Loading submissions...");
+    const token = localStorage.getItem("auth_token");
+    if (!token) {
+      setSubmissionsStatus("Please log in as admin to view submissions.");
+      return;
+    }
+    try {
+      const response = await fetch("/api/admin/submissions", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to load submissions");
+      }
+      setSubmissions(data);
+      setSubmissionsStatus("");
+    } catch (error) {
+      setSubmissionsStatus(error.message);
+    }
+  };
+
   useEffect(() => {
     loadHistory();
+    loadSubmissions();
   }, []);
 
   const handleSubmit = async (event) => {
@@ -185,6 +210,50 @@ function AdminPage() {
                     <td>{new Date(item.exam_time).toISOString()}</td>
                     <td>{new Date(item.createdAt).toLocaleString()}</td>
                     <td>{item.version}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+      <div className="card">
+        <div className="section-title">Submissions</div>
+        {submissionsStatus && <div className="status error">{submissionsStatus}</div>}
+        {submissions.length === 0 && !submissionsStatus && (
+          <div className="helper">No submissions yet.</div>
+        )}
+        {submissions.length > 0 && (
+          <div className="table-wrap">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Exam ID</th>
+                  <th>Student</th>
+                  <th>Submitted</th>
+                  <th>Verified</th>
+                  <th>Answers</th>
+                </tr>
+              </thead>
+              <tbody>
+                {submissions.map((item) => (
+                  <tr key={item._id}>
+                    <td>{item.exam_id}</td>
+                    <td>
+                      {item.student_name || "Unknown"}
+                      {item.student_email ? ` (${item.student_email})` : ""}
+                    </td>
+                    <td>
+                      {item.submitted_at
+                        ? new Date(item.submitted_at).toLocaleString()
+                        : ""}
+                    </td>
+                    <td>{item.verified ? "Yes" : "No"}</td>
+                    <td>
+                      <pre style={{ margin: 0, whiteSpace: "pre-wrap" }}>
+                        {JSON.stringify(item.answers, null, 2)}
+                      </pre>
+                    </td>
                   </tr>
                 ))}
               </tbody>
